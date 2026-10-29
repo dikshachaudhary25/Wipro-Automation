@@ -23,6 +23,7 @@ from __future__ import annotations
 import re
 import time
 import os
+from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Iterable, Optional, Tuple
 
@@ -37,7 +38,13 @@ from selenium.webdriver.support import expected_conditions as EC
 
 
 AUTOSYS_URL = "https://autosysproduction.molina.mhc/wcc/webui/#/"
-WORKBOOK_PATH = r"C:\Users\Chaudh24\OneDrive - Molina Healthcare\Desktop\Molina\TransactionAutomation\jobs_updated.xlsx"
+PROCESSING_DATE = (datetime.now() - timedelta(days=1)).strftime("%Y%m%d")
+WORKBOOK_PATH = os.path.join(
+    os.path.expanduser("~"),
+    "OneDrive - Molina Healthcare",
+    f"Jobs_Updated_{PROCESSING_DATE}.xlsx",
+)
+WORKSHEET_NAME = f"Transaction Count {PROCESSING_DATE}"
 SERVER_NAME = "Autosys_PRO"
 JOB_NAME_COLUMN = "Job Name"
 START_TIME_COLUMN = "Start Time"
@@ -55,11 +62,17 @@ def normalize_text(value: object) -> str:
 def get_worksheet(path: str):
     wb = load_workbook(path, data_only=False)
     required_headers = {JOB_NAME_COLUMN.lower(), START_TIME_COLUMN.lower(), END_TIME_COLUMN.lower()}
-    for ws in wb.worksheets:
-        headers = {normalize_text(cell.value).lower() for cell in ws[1]}
-        if required_headers.issubset(headers):
-            return wb, ws
-    raise ValueError(f"Could not find a worksheet containing {sorted(required_headers)} in workbook: {path}")
+    if WORKSHEET_NAME not in wb.sheetnames:
+        raise ValueError(f"Worksheet not found in workbook: {WORKSHEET_NAME}")
+
+    ws = wb[WORKSHEET_NAME]
+    headers = {normalize_text(cell.value).lower() for cell in ws[1]}
+    if not required_headers.issubset(headers):
+        raise ValueError(
+            f"Worksheet {WORKSHEET_NAME} is missing required headers "
+            f"{sorted(required_headers)} in workbook: {path}"
+        )
+    return wb, ws
 
 
 def find_column_index(row_values: Iterable[object], target: str) -> int:
@@ -81,9 +94,11 @@ def read_jobs_from_excel(path: str):
         raise ValueError(f"Could not find '{JOB_NAME_COLUMN}' column in workbook: {path}")
 
     rows = []
-    for row in ws.iter_rows(min_row=2, values_only=False):
-        if not FIRST_DATA_ROW <= row[0].row <= LAST_DATA_ROW:
-            continue
+    for row in ws.iter_rows(
+        min_row=FIRST_DATA_ROW,
+        max_row=LAST_DATA_ROW,
+        values_only=False,
+    ):
         job_name = normalize_text(row[job_idx].value)
         if not job_name:
             continue
