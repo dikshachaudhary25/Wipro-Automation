@@ -39,18 +39,23 @@ from selenium.webdriver.support import expected_conditions as EC
 
 AUTOSYS_URL = "https://autosysproduction.molina.mhc/wcc/webui/#/"
 PROCESSING_DATE = (datetime.now() - timedelta(days=1)).strftime("%Y%m%d")
-WORKBOOK_PATH = os.path.join(
-    os.path.expanduser("~"),
-    "OneDrive - Molina Healthcare",
-    f"Jobs_Updated_{PROCESSING_DATE}.xlsx",
+WORKBOOK_PATH = os.path.abspath(
+    os.environ.get(
+        "START_ENDTIME_WORKBOOK",
+        os.path.join(
+            os.path.expanduser("~"),
+            "OneDrive - Molina Healthcare",
+            f"Jobs_Updated_{PROCESSING_DATE}.xlsx",
+        ),
+    )
 )
 WORKSHEET_NAME = f"Transaction Count {PROCESSING_DATE}"
 SERVER_NAME = "Autosys_PRO"
 JOB_NAME_COLUMN = "Job Name"
 START_TIME_COLUMN = "Start Time"
 END_TIME_COLUMN = "End Time"
-FIRST_DATA_ROW = 68
-LAST_DATA_ROW = 124
+FIRST_DATA_ROW = int(os.environ.get("START_ENDTIME_FIRST_ROW", "2"))
+LAST_DATA_ROW = int(os.environ.get("START_ENDTIME_LAST_ROW", "124"))
 
 
 def normalize_text(value: object) -> str:
@@ -453,6 +458,8 @@ def main():
             except Exception as exc:
                 print(f"FAILED FOR {job_name}: {exc}")
                 continue
+
+            wb.save(WORKBOOK_PATH)
 
         wb.save(WORKBOOK_PATH)
         print("Workbook updated successfully.")
